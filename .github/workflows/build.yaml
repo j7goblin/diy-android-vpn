@@ -38,35 +38,27 @@ jobs:
             ref_name="${{ github.ref_name }}"
           fi
           echo "ref_name=${ref_name}" >> $GITHUB_ENV
-          cp app/build/outputs/apk/release/hev.sockstun-*-release.apk hev.sockstun-${ref_name}-release.apk
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: hev.sockstun-${{ env.ref_name }}-release.apk
-          path: hev.sockstun-${{ env.ref_name }}-release.apk
-          if-no-files-found: error
-          retention-days: 1
 
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'release'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release
-          pattern: "hev.sockstun-*"
-          merge-multiple: true
-      - name: Upload artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Create release
+      - name: Generate release tag
+        id: tag
         run: |
-          for i in release/hev.sockstun-*; do
-            gh release upload ${{ github.event.release.tag_name }} $i
-          done
+          sudo systemsetup -settimezone Asia/Ho_Chi_Minh
+          # Get date from Google and reformat for macOS date command
+          http_date=$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)
+          macos_date=$(date -jf "%d %b %Y" "$http_date" +"%m%d%H%M%Y")
+          sudo date $macos_date
+          echo "release_tag=ActionBuild_$(date +"%Y.%m.%d_%H-%M-%S")" >> $GITHUB_OUTPUT
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          files: |
+            ./app/build/outputs/apk/release/hev.sockstun-*-release.apk
+      # Done release
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: write
+  pages: write
+  id-token: write
